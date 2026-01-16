@@ -1,0 +1,104 @@
+import express = require("express");
+import { ContentModel, UserModel } from "./db.js";
+import { connect } from "mongoose";
+import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "./config.js";
+import "dotenv/config";
+import { Auth } from "./middleware.js";
+
+const app = express();
+
+async function start() { 
+    await connect(process.env.MONGO_DB_URL as string);
+}
+start();
+
+app.use(express.json());
+
+app.post('/api/v1/signup', async (req, res) => {
+    
+    const username = req.body.username;
+    const password = req.body.password;
+
+    try{
+
+    await UserModel.create({
+        username: username,
+        password: password
+    })
+
+    res.json({
+        message: "you are signed up !!"
+    })
+    } catch(e) {
+        res.status(411).json({
+            message: "User already exist !!"
+        })
+    }   
+
+})
+
+app.post('/api/v1/signin', async (req, res) => {
+
+    const { username, password } = req.body;
+
+    const ExistingUser = await UserModel.findOne({username, password});
+
+    if(ExistingUser){
+        const token = jwt.sign({
+            id : ExistingUser._id
+        }, JWT_SECRET)
+
+        res.json({
+            // ExistingUser,
+            token : token
+        })
+    } else {
+        res.status(403).json({
+            message: "The user does not exist !!"
+        })
+    }
+
+})
+
+app.post('/api/v1/content', Auth, async (req, res) => {
+    const { link, title } = req.body;
+
+    await ContentModel.create({
+        link,
+        title,
+        //@ts-ignore
+        userId: req.userId,
+        tag: []
+    })
+    res.json({
+        msg: "New Content Created !!"
+    })
+})
+
+app.get('/api/v1/content', Auth, async function (req, res) {
+    //@ts-ignore
+    const userId = req.userId;
+    const Content = await ContentModel.findOne({userId}).populate("userId", "username")
+
+    if(Content) {
+        res.json({
+            Content
+        })
+    } else {
+        res.status(403).json({
+            msg: "Content with this title does not exist !!"
+        })
+    }
+    
+})
+
+app.post('/api/v1/brain/share', function(req, res) {
+    
+})
+
+app.get('/api/v1/brain/:sharelink', function (req, res) {
+    
+})
+
+app.listen(3000);

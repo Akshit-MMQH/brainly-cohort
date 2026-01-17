@@ -1,10 +1,12 @@
 import express = require("express");
-import { ContentModel, UserModel } from "./db.js";
+import { ContentModel, LinkModel, UserModel } from "./db.js";
 import { connect } from "mongoose";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "./config.js";
 import "dotenv/config";
 import { Auth } from "./middleware.js";
+import { random } from "./generateRandom.js";
+
 
 const app = express();
 
@@ -67,7 +69,6 @@ app.post('/api/v1/content', Auth, async (req, res) => {
     await ContentModel.create({
         link,
         title,
-        //@ts-ignore
         userId: req.userId,
         tag: []
     })
@@ -93,12 +94,51 @@ app.get('/api/v1/content', Auth, async function (req, res) {
     
 })
 
-app.post('/api/v1/brain/share', function(req, res) {
+app.post('/api/v1/brain/share', Auth, async function(req, res) {
+    const share = req.body.share;
+
+    if(share){
+        await LinkModel.create({
+            userId: req.userId,
+            hash: random(10)
+        }) 
+        res.json({
+            message: "Link has been created !!"
+        })
+    } else {
+            await LinkModel.deleteOne({
+                userId: req.userId
+            })
+        }
     
 })
 
-app.get('/api/v1/brain/:sharelink', function (req, res) {
-    
-})
+app.get('/api/v1/brain/:sharelink', Auth, async function (req, res) {
+    const hash = req.params.sharelink;
+    //@ts-ignore
+    const link = await LinkModel.findOne({
+        hash,
+    });
+
+    if(!link) {
+        res.status(411).json({
+            message: "invalid Link !!"
+        })
+        return;
+    }
+
+    const content = await ContentModel.find({
+        userId: link.userId
+    })
+    const user =  await UserModel.findOne({
+        userId: link.userId
+    })
+
+    res.json({
+        username: user?.username,
+        content: content
+    })
+
+});
 
 app.listen(3000);

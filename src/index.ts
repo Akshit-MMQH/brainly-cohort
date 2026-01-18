@@ -98,24 +98,31 @@ app.post('/api/v1/brain/share', Auth, async function(req, res) {
     const share = req.body.share;
 
     if(share){
+
+        const hash = random(10);
+
         await LinkModel.create({
             userId: req.userId,
-            hash: random(10)
+            hash: hash
         }) 
         res.json({
-            message: "Link has been created !!"
+            message: "Link has been created !!",
+            hash : ` ${hash} this is your link`
         })
     } else {
             await LinkModel.deleteOne({
                 userId: req.userId
+            })
+            res.json({
+                message: "Removed link !!"
             })
         }
     
 })
 
 app.get('/api/v1/brain/:sharelink', Auth, async function (req, res) {
-    const hash = req.params.sharelink;
-    //@ts-ignore
+    const hash = req.params.sharelink!;
+    
     const link = await LinkModel.findOne({
         hash,
     });
@@ -130,8 +137,9 @@ app.get('/api/v1/brain/:sharelink', Auth, async function (req, res) {
     const content = await ContentModel.find({
         userId: link.userId
     })
+
     const user =  await UserModel.findOne({
-        userId: link.userId
+        _id: link.userId
     })
 
     res.json({

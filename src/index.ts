@@ -6,7 +6,7 @@ import { JWT_SECRET } from "./config.js";
 import "dotenv/config";
 import { Auth } from "./middleware.js";
 import { random } from "./generateRandom.js";
-
+import cors from "cors";
 
 const app = express();
 
@@ -16,6 +16,8 @@ async function start() {
 start();
 
 app.use(express.json());
+app.use(cors());
+
 
 app.post('/api/v1/signup', async (req, res) => {
     
@@ -64,40 +66,51 @@ app.post('/api/v1/signin', async (req, res) => {
 })
 
 app.post('/api/v1/content', Auth, async (req, res) => {
-    const { link, title } = req.body;
+    const { link, title, type } = req.body;
 
-    await ContentModel.create({
-        link,
-        title,
-        userId: req.userId,
-        tag: []
-    })
-    res.json({
-        msg: "New Content Created !!"
-    })
+    try {
+        await ContentModel.create({
+            link,
+            title,
+            type,
+            userId: req.userId,
+            tag: []
+        })
+        res.json({
+            msg: "New Content Created !!"
+        })
+    } catch(e) {
+        res.status(500).json({
+            msg: "Failed to create content"
+        })
+    }
 })
 
 app.get('/api/v1/content', Auth, async function (req, res) {
     //@ts-ignore
     const userId = req.userId;
-    const Content = await ContentModel.findOne({userId}).populate("userId", "username")
+    const Content = await ContentModel.find({userId}).populate("userId", "username")
 
-    if(Content) {
-        res.json({
-            Content
-        })
-    } else {
-        res.status(403).json({
-            msg: "Content with this title does not exist !!"
-        })
-    }
-    
+    res.json({
+        Content
+    })
 })
 
 app.post('/api/v1/brain/share', Auth, async function(req, res) {
     const share = req.body.share;
 
     if(share){
+        const existingLink = await LinkModel.findOne({
+            userId: req.userId
+        });
+
+        if(existingLink) {
+            res.json({
+                message: "Link already exists !!",
+                hash: existingLink.hash
+            })
+            return;
+        }
 
         const hash = random(10);
 
@@ -107,7 +120,7 @@ app.post('/api/v1/brain/share', Auth, async function(req, res) {
         }) 
         res.json({
             message: "Link has been created !!",
-            hash : ` ${hash} this is your link`
+            hash: hash
         })
     } else {
             await LinkModel.deleteOne({
@@ -120,7 +133,7 @@ app.post('/api/v1/brain/share', Auth, async function(req, res) {
     
 })
 
-app.get('/api/v1/brain/:sharelink', Auth, async function (req, res) {
+app.get('/api/v1/brain/:sharelink', async function (req, res) {
     const hash = req.params.sharelink!;
     
     const link = await LinkModel.findOne({
